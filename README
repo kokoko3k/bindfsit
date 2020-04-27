@@ -1,0 +1,18 @@
+bindit
+
+bindit is a script that mounts a filesystem and mount it via bindfs in another folder.
+Then, it checks if the real mount is functional, if it is not, it kills the current binded mounts
+and rebinds it.
+This comes handy when a process is stuck while trying to access a non functional filesystem (eg: cifs,nfs)
+that cannot be unmounted.
+Since bindfs lives in userspace, the scripts can kill it and will free the stuck process.
+Timeouts are configurable in the configuration file.
+
+By defaults, configuration files live in /etc/bindfs/, an example is provided.
+
+USAGE:
+* Make a copy of example.cfg (name it, say, mymount.cfg), configure it and put it under/etc/bindfs
+* Copy the provided systemd service file in /etc/systemd/system/
+* issue systemctl daemon-reload with root privileges
+* start/enable bindfsit@mymount.cfg
+

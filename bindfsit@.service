@@ -1,0 +1,12 @@
+[Unit]
+Description=Binds filesystems and recovers from hangs using config %I
+
+[Service]
+Type=simple
+
+#Config files live in /etc/bindfsit/
+ExecStart=/home/koko/scripts/bindfsit.sh /etc/bindfsit/"%I"
+
+[Install]
+WantedBy=default.target
+
