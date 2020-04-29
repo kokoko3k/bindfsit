@@ -42,16 +42,6 @@ echo mount_cmd="$mount_cmd"
 echo recover_cmd="$recover_cmd"
 echo user="$user"
 
-#Make mountpoints:
-if [ ! -d "$real_mountpoint" ] ; then mkdir -p "$real_mountpoint"  || exit 1 ; fi
-if [ ! -d "$bind_mountpoint" ] ; then mkdir -p "$bind_mountpoint"  || exit 1 ; fi
-
-#mount things?
-if [ ! -z "$mount_cmd" ] ; then
-	while ! sh -c "$mount_cmd" ; do sleep $restart_after ; done
-fi
-
-
 function clean {
 	#Umount bindfs, next execute "$recover_cmd", then exit.
 	echo [..] Cleaning...
@@ -74,6 +64,15 @@ function finish {
 	exit
 }
 
+#Make mountpoints:
+if [ ! -d "$real_mountpoint" ] ; then mkdir -p "$real_mountpoint"  || exit 1 ; fi
+if [ ! -d "$bind_mountpoint" ] ; then mkdir -p "$bind_mountpoint"  || exit 1 ; fi
+
+#mount things?
+if [ ! -z "$mount_cmd" ] ; then
+	while ! sh -c "$mount_cmd" ; do sleep $restart_after ; done
+fi
+
 trap finish INT TERM EXIT
 
 #Prepare environment
@@ -84,20 +83,27 @@ while true ; do
     echo [..] binding "$real_mountpoint" to "$bind_mountpoint"
    	bindfs -u $user "$real_mountpoint" "$bind_mountpoint"
     #Getting the pid of bindfs is tricky.
-       bindfs_pid=$(ps -eo pid,args|grep "bindfs $real_mountpoint $bind_mountpoint" |grep -vi grep |awk '{print $1}')
+    bindfs_pid=$(ps -eo pid,args|grep bindfs | grep "$real_mountpoint $bind_mountpoint" |grep -vi grep |awk '{print $1}')
+	echo bindfs pid: $bindfs_pid
 	echo [OK] mounted bind "$cifs_mountpoint" on "$bind_mountpoint", pid: "$bindfs_pid"
 
     echo [OK] Start Main check cycle, whill check every $check_every seconds...
     while true ; do
+
+		echo "check if $real_mountpoint is mounted"
+		if ! findmnt "$real_mountpoint" &>/dev/null ; then
+			echo "$real_mountpoint does not seem to be mounted anymore."
+			echo "remounting..."
+			timeout -k 10 $restart_after $mount_cmd
+		fi
+
 		#fixme: can we use stat and not ls here?
-        if ! timeout -k 1 $timeout_after ls "$bind_mountpoint" &>/dev/null ; then 
-            echo no answer from bindfs for "$bind_mountpoint"
+        if ! timeout -k 10 $timeout_after ls "$bind_mountpoint" &>/dev/null ; then
+            echo "no answer from bindfs for $bind_mountpoint"
             clean
             break
-                #else
-            #echo "$(date) Share is alive"
         fi
-            sleep $check_every
+        sleep $check_every
     done
 
     echo [..] Waiting $restart_after seconds: $(date)
