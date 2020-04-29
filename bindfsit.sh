@@ -42,7 +42,7 @@ echo mount_cmd="$mount_cmd"
 echo recover_cmd="$recover_cmd"
 echo user="$user"
 
-function clean {
+function kill_bindfs_and_recover {
 	#Umount bindfs, next execute "$recover_cmd", then exit.
 	echo [..] Cleaning...
 	#The only open handle opened on the cifs share should be the bindfs one.
@@ -58,10 +58,24 @@ function clean {
 
 function finish {
     echo exiting...
-	clean
+	kill_bindfs_and_recover
 	umount -l "$real_mountpoint"
 	trap exit INT TERM EXIT
 	exit
+}
+
+function mount_real {
+	echo "mounting $real_mountpoint"
+	timeout -k 10 $restart_after $mount_cmd
+}
+
+function mount_bind {
+    echo [..] binding "$real_mountpoint" to "$bind_mountpoint"
+    bindfs -u $user "$real_mountpoint" "$bind_mountpoint"
+    #Getting the pid of bindfs is tricky.
+    bindfs_pid=$(ps -eo pid,args|grep bindfs | grep " $real_mountpoint $bind_mountpoint" |grep -vi grep |awk '{print $1}')
+    echo bindfs pid: $bindfs_pid
+    echo [OK] mounted bind "$cifs_mountpoint" on "$bind_mountpoint", pid: "$bindfs_pid"
 }
 
 #Make mountpoints:
@@ -80,12 +94,7 @@ trap finish INT TERM EXIT
 
 while true ; do
     #Mount things:
-    echo [..] binding "$real_mountpoint" to "$bind_mountpoint"
-   	bindfs -u $user "$real_mountpoint" "$bind_mountpoint"
-    #Getting the pid of bindfs is tricky.
-    bindfs_pid=$(ps -eo pid,args|grep bindfs | grep "$real_mountpoint $bind_mountpoint" |grep -vi grep |awk '{print $1}')
-	echo bindfs pid: $bindfs_pid
-	echo [OK] mounted bind "$cifs_mountpoint" on "$bind_mountpoint", pid: "$bindfs_pid"
+	mount_bind
 
     echo [OK] Start Main check cycle, whill check every $check_every seconds...
     while true ; do
@@ -93,14 +102,15 @@ while true ; do
 		#echo "check if $real_mountpoint is mounted"
 		if ! findmnt "$real_mountpoint" &>/dev/null ; then
 			echo "$real_mountpoint does not seem to be mounted anymore."
-			echo "remounting..."
-			timeout -k 10 $restart_after $mount_cmd
+			kill_bindfs_and_recover
+			mount_real
+			mount_bind
 		fi
 
 		#fixme: can we use stat and not ls here?
         if ! timeout -k 10 $timeout_after ls "$bind_mountpoint" &>/dev/null ; then
             echo "no answer from bindfs for $bind_mountpoint"
-            clean
+            kill_bindfs_and_recover
             break
         fi
         sleep $check_every
