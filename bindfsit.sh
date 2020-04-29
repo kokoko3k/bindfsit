@@ -90,7 +90,7 @@ while true ; do
     echo [OK] Start Main check cycle, whill check every $check_every seconds...
     while true ; do
 
-		echo "check if $real_mountpoint is mounted"
+		#echo "check if $real_mountpoint is mounted"
 		if ! findmnt "$real_mountpoint" &>/dev/null ; then
 			echo "$real_mountpoint does not seem to be mounted anymore."
 			echo "remounting..."
