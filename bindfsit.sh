@@ -118,7 +118,7 @@ while true ; do
             break
         fi
         #echo sleeping
-        #sleep $check_every
+        sleep $check_every
     done
 
     force_umount
