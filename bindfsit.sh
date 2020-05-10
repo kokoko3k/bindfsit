@@ -83,7 +83,7 @@ function mount_real {
                 echo "[EE] Couldn't mount $real_mountpoint in $try tries, giving up :("
                 exit
             fi
-            debug "($try/$mount_max_tries) Mount failed, sleeping $mount_retry_after seconds to retry"
+            echo "($try/$mount_max_tries) Mount failed, sleeping $mount_retry_after seconds to retry"
             sleep $mount_retry_after ;
             let try=try+1
             debug "($try/$mount_max_tries) Retrying to mount..."
