@@ -29,6 +29,7 @@
 #Set defaults before sourcing configuration file:
     mount_timeout=5
     mount_max_tries=5
+	mount_retry_after=10
     check_every=10
     timeout_after=40
     restart_after=30
@@ -82,10 +83,10 @@ function mount_real {
                 echo "[EE] Couldn't mount $real_mountpoint in $try tries, giving up :("
                 exit
             fi
-            debug "Mount failed, sleeping $restart_after seconds to retry"
-            sleep $restart_after ;
+            debug "($try/$mount_max_tries) Mount failed, sleeping $mount_retry_after seconds to retry"
+            sleep $mount_retry_after ;
             let try=try+1
-            debug "Retrying to mount... ($try/$mount_max_tries)"
+            debug "($try/$mount_max_tries) Retrying to mount..."
         done
     fi
     echo "mounted $real_mountpoint"
@@ -113,6 +114,7 @@ echo user="$user"
 echo mount_cmd="$mount_cmd"
 echo mount_timeout="$mount_timeout"
 echo mount_max_tries="$mount_max_tries"
+echo mount_retry_after="$mount_retry_after"
 echo timeout_after="$timeout_after"
 echo check_every="$check_every"
 echo restart_after="$restart_after"
@@ -146,7 +148,7 @@ while true ; do
             debug "Share is alive on $real_mountpoint !"
         fi
         debug "sleeping $check_every"
-        sleep $check_every
+        sleep $mount_retry_after
     done
 
     force_umount
