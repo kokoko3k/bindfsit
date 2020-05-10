@@ -4,6 +4,7 @@
 #if mount_cmd is not empty it will be executed when script starts.
 
 #$1 is the configuration file, sourced by me with (eg):
+	#mount_timeout=5 #seconds
     #check_every=10 #seconds
     #timeout_after=40 #seconds
     #restart_after=5 #seconds
@@ -12,22 +13,36 @@
     #mount_cmd="mount.cifs //pi/all $real_mountpoint -o rsize=131072,wsize=131072
     #user=koko # Makes all files owned by the specified user.
                # Also causes chown on the mounted filesystem to always fail.
+    #SET_DEBUG=0|1 #Print verbose informations
 
-source "$1" || exit 1
-
-# It is handy to bind the whole autofs tree, i use it that way:
-
-#koko@slimer# cat /etc/systemd/system/bindfs_autofs.service 
+## cat /usr/lib/systemd/system/bindfsit\@.service 
 #[Unit]
-#Description=Binds the autofs tree and recover from stalls
-#
+#Description=Binds filesystems and recovers from hangs using config %I
 #[Service]
 #Type=simple
-#ExecStartPre=systemctl start autofs
-#ExecStart=/home/koko/scripts/bindfs_it.sh /mnt/autofs.real /mnt/autofs "umount -l /mnt/autofs.real/*"
-#
+#Config files live in /etc/bindfsit/
+#ExecStart=/usr/bin/bindfsit.sh /etc/bindfsit/"%I"
 #[Install]
 #WantedBy=default.target
+
+
+#Set defaults before sourcing configuration file:
+    mount_timeout=5
+    mount_max_tries=5
+    check_every=10
+    timeout_after=40
+    restart_after=30
+    real_mountpoint=/mnt/.bindfs/"$myownhost"
+    bind_mountpoint=/mnt/bindfs/"$myownhost"
+    recover_cmd=""
+    SET_DEBUG=0
+
+#Read configuration file and override defaults:
+    source "$1" || exit 1
+
+function debug {
+	[ "$SET_DEBUG" = "1" ] && echo "[DD] $1"
+}
 
 function force_umount {
 	echo [..] Cleaning...
@@ -58,13 +73,22 @@ function finish {
 }
 
 function mount_real {
-    echo "mounting $real_mountpoint"
+    try=1
+	#mount real mountpoint, wait at most 5+1 seconds every time it tries
     if [ ! -z "$mount_cmd" ] ; then
-        while ! sh -c "$mount_cmd" ; do 
-           sleep $restart_after ; 
+    echo "Trying to mount $real_mountpoint"
+        while ! sh -c "timeout -k 1 $mount_timeout $mount_cmd" ; do
+            if [ "$try" = "$mount_max_tries" ] ; then
+                echo "[EE] Couldn't mount $real_mountpoint in $try tries, giving up :("
+                exit
+            fi
+            debug "Mount failed, sleeping $restart_after seconds to retry"
+            sleep $restart_after ;
+            let try=try+1
+            debug "Retrying to mount... ($try/$mount_max_tries)"
         done
     fi
-    echo "mounted $real_mountpoint"   
+    echo "mounted $real_mountpoint"
 }
 
 function mount_bind {
@@ -77,23 +101,25 @@ function mount_bind {
 }
 
 
-
 # MAIN ####################################
 
 trap finish INT TERM EXIT
 
 echo $(basename $0) config:
 echo config file="$1"
-echo check_every="$check_every"
-echo timeout_after="$timeout_after"
-echo restart_after="$restart_after"
 echo real_mountpoint="$real_mountpoint"
 echo bind_mountpoint="$bind_mountpoint"
-echo mount_cmd="$mount_cmd"
-echo recover_cmd="$recover_cmd"
 echo user="$user"
+echo mount_cmd="$mount_cmd"
+echo mount_timeout="$mount_timeout"
+echo mount_max_tries="$mount_max_tries"
+echo timeout_after="$timeout_after"
+echo check_every="$check_every"
+echo restart_after="$restart_after"
+echo recover_cmd="$recover_cmd"
 
 #Make mountpoints:
+debug "Making mountpoints"
 if [ ! -d "$real_mountpoint" ] ; then mkdir -p "$real_mountpoint"  || exit 1 ; fi
 if [ ! -d "$bind_mountpoint" ] ; then mkdir -p "$bind_mountpoint"  || exit 1 ; fi
 
@@ -116,8 +142,10 @@ while true ; do
         if ! timeout -k 1 $timeout_after ls "$real_mountpoint" &>/dev/null ; then
             echo "no answer from $real_mountpoint"
             break
+                else
+            debug "Share is alive on $real_mountpoint !"
         fi
-        #echo sleeping
+        debug "sleeping $check_every"
         sleep $check_every
     done
 
