@@ -46,16 +46,30 @@ function debug {
 }
 
 function force_umount {
-	echo [..] Cleaning...
-	#The only open handle opened on the cifs share should be the bindfs one.
-	echo [..] kill bindfs
-	kill -9 $bindfs_pid
-	echo [..] forcing umounting bindfs on "$bind_mountpoint"
-	umount -f "$bind_mountpoint"
-	echo [..] Lazying umounting "$real_mountpoint"
-	umount -l "$real_mountpoint"
-	echo [OK] Done.
-	echo [OK] Done cleaning.
+    echo [..] Cleaning...
+    #The only open handle opened on the cifs share should be the bindfs one.
+    echo [..] kill bindfs
+    kill -9 $bindfs_pid
+    try=0
+	while true ; do
+        let try=try+1
+	    echo [..] forcing umounting bindfs on "$bind_mountpoint, try: $try"
+        umount -f "$bind_mountpoint"
+        if ! grep " $bind_mountpoint " /proc/self/mounts &>/dev/null ; then break ;fi
+            #else...
+        echo [EE] "$bind_mountpoint is still mounted."
+        if [ $try = 6 ] ; then
+            echo "[EE] Couldn't (force) umount $bind_mountpoint"
+            echo "[..] Lazying umounting bindfs on $bind_mountpoint"
+            mount -l "$bind_mountpoint"
+            break
+        fi
+        sleep 1
+    done
+    echo "[..] Lazying umounting $real_mountpoint"
+    umount -l "$real_mountpoint"
+    echo "[OK] Done."
+    echo "[OK] Done cleaning."
 }
 
 function execute_recover_cmd  {
