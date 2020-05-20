@@ -138,6 +138,8 @@ echo recover_cmd="$recover_cmd"
 debug "Making mountpoints"
 if [ ! -d "$real_mountpoint" ] ; then mkdir -p "$real_mountpoint"  || exit 1 ; fi
 if [ ! -d "$bind_mountpoint" ] ; then mkdir -p "$bind_mountpoint"  || exit 1 ; fi
+echo "[..] Setting restrictive permissions"
+chmod 700 "$real_mountpoint"
 
 while true ; do
     mount_real
