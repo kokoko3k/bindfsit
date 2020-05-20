@@ -146,7 +146,7 @@ while true ; do
     echo [OK] Start Main check cycle, whill check every $check_every seconds...
     while true ; do
 
-        #echo "check if $real_mountpoint is mounted"
+        debug "check if $real_mountpoint is mounted"
         if ! grep " $real_mountpoint " /proc/self/mounts &>/dev/null ; then
             echo "$real_mountpoint does not seem to be mounted anymore."
 	    break
@@ -154,7 +154,7 @@ while true ; do
 
         #fixme: can we use stat and not ls here?
 
-	    #echo "check if $real_mountpoint is answering"
+	    debug "check if $real_mountpoint is answering"
         if ! timeout -k 1 $timeout_after ls "$real_mountpoint" &>/dev/null ; then
             echo "no answer from $real_mountpoint"
             break
