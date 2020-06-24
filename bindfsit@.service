@@ -5,7 +5,7 @@ Description=Binds filesystems and recovers from hangs using config %I
 Type=simple
 
 #Config files live in /etc/bindfsit/
-ExecStart=/usr/bin/bindfsit.sh /etc/bindfsit/"%I"
+ExecStart=/usr/bin/bindfsit.sh /etc/bindfsit/"%i"
 
 [Install]
 WantedBy=default.target
